@@ -197,7 +197,7 @@ export function TriageConsole({ initialHealth }: { initialHealth: Health }) {
           </Badge>
           <Button
             variant="ghost"
-            size="icon"
+            size="icon" 
             onClick={poll}
             aria-label="Recheck Ollama"
           >

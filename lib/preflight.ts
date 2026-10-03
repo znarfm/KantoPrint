@@ -9,6 +9,7 @@ import {
   type PixelStats,
   type Verdict,
 } from "./prepress"
+import { jobFlags, operatorBrief } from "./flags"
 import { judgeVerdict, inkProfile } from "./judge"
 import { prepareRaster } from "./raster"
 
@@ -120,7 +121,11 @@ export async function runPreflight(args: {
   verdict = reconcile(verdict, pixels)
   // Portrait media feed: a landscape page wastes the sheet unless it turns.
   const needsRotation = landscape
-  const notes = brief(verdict, pixels, needsRotation)
+  // Same flag list the card renders, so chips and prose cannot drift apart.
+  const notes = operatorBrief(
+    verdict,
+    jobFlags({ verdict, pixels, needsRotation })
+  )
   const operatorNotes = modelWarning
     ? `${notes} Vision call failed: ${short(modelWarning)}`
     : notes
@@ -144,52 +149,6 @@ export async function runPreflight(args: {
     },
     modelWarning,
   }
-}
-
-/**
- * Operator brief, composed from the flags the card already shows. The model was
- * asked for this field and answered "Set up the material for printing", which is
- * both useless and the most expensive 25 tokens in the reply.
- */
-function brief(
-  verdict: Verdict,
-  p: PixelStats,
-  needsRotation: boolean
-): string {
-  const steps: string[] = []
-
-  if (needsRotation) steps.push("Rotate 90 degrees before feeding")
-  if (verdict.hasBleedMargins) {
-    steps.push(
-      p.hasTransparency
-        ? "Artwork touches the trim: add 3 mm bleed before cutting"
-        : "Ink reaches the trim: pull content in 3 mm or accept the edge"
-    )
-  }
-  // Vinyl does not curl, so the paper warning is noise on a sticker.
-  const onVinyl = verdict.recommendedMedia === VINYL_STOCK
-  if (verdict.inkRiskLevel === "high" && !onVinyl) {
-    steps.push(
-      `Heavy ink ${p.inkLoadPct}%: dry 10 min before stacking, expect curl`
-    )
-  } else if (verdict.inkRiskLevel === "high") {
-    steps.push(`Heavy ink ${p.inkLoadPct}%: matte side up, skip the roller`)
-  } else if (verdict.inkRiskLevel === "medium") {
-    steps.push(`Ink ${p.inkLoadPct}%: print single-sided, short dry`)
-  }
-  if (verdict.documentType === "sticker") {
-    steps.push("Test a corner cut for kerf before the full run")
-  }
-  if (verdict.documentType === "photo" && p.peakTileInkPct > 40) {
-    steps.push("Print best quality, not economy draft")
-  }
-  if (verdict.documentType === "unknown") {
-    steps.push("Check the raster by eye before loading paper")
-  }
-
-  return steps.length > 0
-    ? `${steps.join("; ")}.`
-    : `Load ${verdict.recommendedMedia} and print at 100% scale.`
 }
 
 /**

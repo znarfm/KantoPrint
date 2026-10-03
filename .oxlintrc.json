@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "nextjs", "import", "jsx-a11y"],
+  "jsPlugins": ["@shadcn/lint"],
+  "ignorePatterns": [
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "fixtures/**",
+    "components/ui/**"
+  ]
+}

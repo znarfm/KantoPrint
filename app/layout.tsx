@@ -1,23 +1,26 @@
-import { Geist_Mono, Outfit, Instrument_Sans } from "next/font/google";
+import { Geist_Mono, Outfit, Instrument_Sans } from "next/font/google"
 
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
-const instrumentSansHeading = Instrument_Sans({ subsets: ["latin"], variable: "--font-heading" });
+const instrumentSansHeading = Instrument_Sans({
+  subsets: ["latin"],
+  variable: "--font-heading",
+})
 
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
+const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
-});
+})
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html
@@ -28,7 +31,7 @@ export default function RootLayout({
         fontMono.variable,
         "font-sans",
         outfit.variable,
-        instrumentSansHeading.variable,
+        instrumentSansHeading.variable
       )}
     >
       <body>
@@ -37,5 +40,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
