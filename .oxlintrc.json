@@ -9,5 +9,30 @@
     "next-env.d.ts",
     "fixtures/**",
     "components/ui/**"
-  ]
+  ],
+  "rules": {
+    "shadcn/no-restyle": [
+      "error",
+      {
+        "allow": ["layout"],
+        "contracts": [
+          { "pattern": "^Progress$", "allow": ["layout", "spacing"] },
+          {
+            "pattern": "^ProgressLabel$",
+            "allow": ["layout", "typography", "color"]
+          },
+          {
+            "pattern": "^ProgressValue$",
+            "allow": ["layout", "typography", "color"]
+          },
+          { "pattern": "^Label$", "allow": ["layout", "typography"] }
+        ]
+      }
+    ],
+    "shadcn/no-arbitrary-values": ["error", { "allow": ["layout"] }],
+    "shadcn/no-raw-colors": "error",
+    "shadcn/no-inline-styles": "error",
+    "shadcn/no-unknown-classes": "error",
+    "shadcn/require-static-classes": "error"
+  }
 }

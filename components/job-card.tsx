@@ -53,12 +53,6 @@ const TONE_VARIANT = {
   note: "ghost",
 } as const
 
-const RISK_TEXT = {
-  low: "text-emerald-600 dark:text-emerald-400",
-  medium: "text-amber-600 dark:text-amber-400",
-  high: "text-destructive",
-} as const
-
 function Dimension({ page }: { page: PageResult["page"] }) {
   const size =
     page.kind === "pdf"
@@ -81,12 +75,18 @@ function InkGauge({ page }: { page: PageResult }) {
           Ink load
         </ProgressLabel>
         <ProgressValue
-          className={cn("font-mono font-medium", RISK_TEXT[page.inkRiskLevel])}
+          className={
+            page.inkRiskLevel === "high"
+              ? "font-mono font-medium text-destructive"
+              : page.inkRiskLevel === "medium"
+                ? "font-mono font-medium text-warning"
+                : "font-mono font-medium text-safe"
+          }
         >
           {() => `${page.pixels.inkLoadPct}%`}
         </ProgressValue>
       </Progress>
-      <p className="font-mono text-[10px] text-muted-foreground">
+      <p className="font-mono text-xs text-muted-foreground">
         peak tile {page.pixels.peakTileInkPct}% · solid{" "}
         {page.pixels.darkAreaPct}% · edge {page.pixels.edgeInkPct}% ·{" "}
         {page.pixels.saturation < 0.12 ? "mono" : "colour"}
@@ -114,10 +114,6 @@ function FlagChips({ page }: { page: PageResult }) {
           key={f.id}
           variant={TONE_VARIANT[f.tone]}
           data-icon="inline-start"
-          className={cn(
-            f.tone === "warn" &&
-              "border-amber-500/40 text-amber-600 dark:text-amber-400"
-          )}
         >
           <HugeiconsIcon icon={FLAG_ICON[f.id] ?? Alert02Icon} />
           {f.label}
@@ -151,7 +147,7 @@ function PageBody({
           alt={`Page ${page.index} raster`}
           className="w-full rounded-md border bg-white object-contain"
         />
-        <p className="font-mono text-[10px] text-muted-foreground">
+        <p className="font-mono text-xs text-muted-foreground">
           {page.timingsMs.total} ms · vision {page.timingsMs.vision} ms
           {page.lowDetail && " · low detail"}
         </p>
@@ -180,7 +176,7 @@ function PageBody({
             {page.operatorNotes}
           </p>
           {page.modelWarning && (
-            <p className="font-mono text-[10px] text-amber-600">
+            <p className="font-mono text-xs text-warning">
               {page.modelWarning}
             </p>
           )}
@@ -200,9 +196,7 @@ function PageRow({ result, page }: { result: JobResult; page: PageResult }) {
           </p>
           <Dimension page={page.page} />
         </div>
-        <Badge variant="outline" className="capitalize">
-          {page.verdict.documentType}
-        </Badge>
+        <Badge variant="outline">{page.verdict.documentType}</Badge>
       </header>
       <PageBody page={page} />
       <div className="mt-3 space-y-2">
@@ -211,9 +205,7 @@ function PageRow({ result, page }: { result: JobResult; page: PageResult }) {
         </div>
         <p className="text-sm leading-snug text-pretty">{page.operatorNotes}</p>
         {page.modelWarning && (
-          <p className="font-mono text-[10px] text-amber-600">
-            {page.modelWarning}
-          </p>
+          <p className="font-mono text-xs text-warning">{page.modelWarning}</p>
         )}
       </div>
     </li>
@@ -229,7 +221,7 @@ function Pending({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border p-4">
-      <Skeleton className="size-14 rounded-md" />
+      <Skeleton className="size-14" />
       <div className="min-w-0 flex-1 space-y-2">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-3 w-1/3" />
@@ -308,14 +300,12 @@ export function JobCard({
               mixed
             </Badge>
           )}
-          <Badge variant="outline" className="capitalize">
-            {lead.verdict.documentType}
-          </Badge>
+          <Badge variant="outline">{lead.verdict.documentType}</Badge>
         </div>
       </header>
 
       {result.pagesSkipped > 0 && (
-        <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+        <p className="mt-2 text-xs text-warning">
           {result.pagesSkipped} page{result.pagesSkipped === 1 ? "" : "s"} past
           the per-file cap were not analysed.
         </p>

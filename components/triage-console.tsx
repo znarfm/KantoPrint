@@ -7,7 +7,6 @@ import { Header } from "@/components/header"
 import { JobCard } from "@/components/job-card"
 import { TrayFilter } from "@/components/tray-filter"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -78,12 +77,8 @@ export function TriageConsole({
             checked={queue.detail}
             onCheckedChange={queue.setDetail}
           />
-          <Label htmlFor="detail" className="text-sm">
-            Read small type
-          </Label>
-          <Badge variant="outline" className="font-mono text-[10px]">
-            512px
-          </Badge>
+          <Label htmlFor="detail">Read small type</Label>
+          <span className="font-mono text-xs text-muted-foreground">512px</span>
         </div>
         <p className="text-xs text-muted-foreground">
           Detail mode costs about 1.7x the vision time per page.
