@@ -1,6 +1,19 @@
-import { type PixelStats, type Verdict, VINYL_STOCK } from "./prepress"
+import {
+  type InkRiskLevel,
+  type MediaStock,
+  type PixelStats,
+  type Verdict,
+  VINYL_STOCK,
+} from "./prepress"
 
 /** risk: stop and change the job. warn: change how you run it. note: look. */
+/** Sparse page: the shape of a form, and the shape whose type is too small to read. */
+export function isTextLike(
+  p: Pick<PixelStats, "inkLoadPct" | "darkAreaPct">
+): boolean {
+  return p.inkLoadPct < 4 && p.darkAreaPct < 6
+}
+
 export type FlagTone = "risk" | "warn" | "note"
 
 export type JobFlag = {
@@ -16,6 +29,8 @@ export type FlagInput = {
   verdict: Verdict
   pixels: PixelStats
   needsRotation: boolean
+  /** Measured, not model-authored. See inkRiskFromLoad. */
+  inkRiskLevel: InkRiskLevel
 }
 
 /**
@@ -30,11 +45,12 @@ export function jobFlags({
   verdict,
   pixels,
   needsRotation,
+  inkRiskLevel,
 }: FlagInput): JobFlag[] {
   const flags: JobFlag[] = []
   const onVinyl = verdict.recommendedMedia === VINYL_STOCK
 
-  if (verdict.inkRiskLevel === "high") {
+  if (inkRiskLevel === "high") {
     flags.push(
       onVinyl
         ? {
@@ -50,7 +66,7 @@ export function jobFlags({
             instruction: `Heavy ink ${pixels.inkLoadPct}%: dry 10 min before stacking, expect curl`,
           }
     )
-  } else if (verdict.inkRiskLevel === "medium") {
+  } else if (inkRiskLevel === "medium") {
     flags.push({
       id: "ink-wet",
       label: "Drying risk",
@@ -119,9 +135,9 @@ export function jobFlags({
 }
 
 /** Clean job: no flags fired, so say what to load and leave it there. */
-export function operatorBrief(verdict: Verdict, flags: JobFlag[]): string {
+export function operatorBrief(media: MediaStock, flags: JobFlag[]): string {
   if (flags.length === 0) {
-    return `Load ${verdict.recommendedMedia} and print at 100% scale.`
+    return `Load ${media} and print at 100% scale.`
   }
   return `${flags.map((f) => f.instruction).join("; ")}.`
 }

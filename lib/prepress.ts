@@ -9,8 +9,6 @@ export const documentTypeSchema = z.enum([
   "unknown",
 ])
 
-export const inkRiskSchema = z.enum(["low", "medium", "high"])
-
 /**
  * Tray stock. An enum rather than prose: a 2B model invents "inkjet vinyl" if
  * you let it write the label, and the operator needs a tray key to sort by.
@@ -28,6 +26,8 @@ export const MEDIA_STOCKS = [
   VINYL_STOCK,
 ] as const
 
+export const inkRiskSchema = z.enum(["low", "medium", "high"])
+
 export const mediaSchema = z.enum(MEDIA_STOCKS)
 export type MediaStock = z.infer<typeof mediaSchema>
 
@@ -35,8 +35,12 @@ export type MediaStock = z.infer<typeof mediaSchema>
  * Model contract. Single source of truth: `z.toJSONSchema(verdictSchema)` is
  * handed to Ollama as the `format` grammar, then the raw text is parsed back
  * through the same schema. Nothing model-authored reaches the UI unvalidated.
+ *
+ * `inkRiskLevel` is deliberately absent: the pixel pass measures ink load and
+ * owns the band, so asking the model for it only produced a number that
+ * disagreed with the gauge on the same card.
  */
-export const verdictSchema = z.object({
+export const verdictSchema = z.strictObject({
   documentType: documentTypeSchema,
   recommendedMedia: mediaSchema.describe(
     "Tray stock that suits this job type first, ink load second."
@@ -46,7 +50,6 @@ export const verdictSchema = z.object({
     .describe(
       "True when ink or a cut line touches the trim edge (standard bleed is 3 mm / 0.125 in)."
     ),
-  inkRiskLevel: inkRiskSchema,
 })
 
 /** Deterministic pixel metrics. Model never authors these. */
@@ -74,33 +77,52 @@ export const pageInfoSchema = z.object({
   heightMm: z.number(),
   widthIn: z.number(),
   heightIn: z.number(),
+  /** Pages in the source document, not the number analysed. */
   pageCount: z.number(),
   /** DPI the page was rasterised at before downscaling. */
   rasterDpi: z.number(),
-  pagesAnalyzed: z.number().nullable(),
+})
+
+export const timingsSchema = z.object({
+  raster: z.number(),
+  pixels: z.number(),
+  vision: z.number(),
+  total: z.number(),
+})
+
+/** One analysed page. A PDF produces one of these per page. */
+export const pageResultSchema = z.object({
+  /** 1-based, matches the page the operator sees in the reader. */
+  index: z.number(),
+  page: pageInfoSchema,
+  pixels: pixelStatsSchema,
+  verdict: verdictSchema,
+  /** Ink band from the measured load. See inkRiskFromLoad. */
+  inkRiskLevel: inkRiskSchema,
+  /** Portrait media feed, so a landscape page should turn. Geometry, not guesswork. */
+  needsRotation: z.boolean(),
+  /** Composed from the flags and the gauge, not model prose. See flags.ts. */
+  operatorNotes: z.string(),
+  /** data: URL of the downscaled raster handed to the vision model. */
+  thumbnail: z.string(),
+  /** True when the thumbnail was rendered small enough that small type is not legible. */
+  lowDetail: z.boolean(),
+  /** Long edge the thumbnail was rendered at, so the caveat can name it. */
+  thumbPx: z.number(),
+  timingsMs: timingsSchema,
+  /** Set when Gemma missed the contract and the retry did not land. */
+  modelWarning: z.string().nullable(),
 })
 
 export const jobResultSchema = z.object({
   fileName: z.string(),
   byteSize: z.number(),
   mimeType: z.string(),
-  page: pageInfoSchema,
-  pixels: pixelStatsSchema,
-  verdict: verdictSchema,
-  /** Portrait media feed, so a landscape page should turn. Geometry, not guesswork. */
-  needsRotation: z.boolean(),
-  /** Composed from the flags and the gauge, not model prose. See preflight.ts. */
-  operatorNotes: z.string(),
-  /** data: URL of the 512px thumbnail handed to the vision model. */
-  thumbnail: z.string(),
-  timingsMs: z.object({
-    raster: z.number(),
-    pixels: z.number(),
-    vision: z.number(),
-    total: z.number(),
-  }),
-  /** Set when Gemma returned JSON that failed validation and the retry did not land. */
-  modelWarning: z.string().nullable(),
+  pageCount: z.number(),
+  pages: z.array(pageResultSchema).min(1),
+  /** Pages present in the document but not analysed, because of the page cap. */
+  pagesSkipped: z.number(),
+  timingsMs: z.object({ total: z.number() }),
 })
 
 export type DocumentType = z.infer<typeof documentTypeSchema>
@@ -108,14 +130,18 @@ export type InkRiskLevel = z.infer<typeof inkRiskSchema>
 export type Verdict = z.infer<typeof verdictSchema>
 export type PixelStats = z.infer<typeof pixelStatsSchema>
 export type PageInfo = z.infer<typeof pageInfoSchema>
+export type PageResult = z.infer<typeof pageResultSchema>
 export type JobResult = z.infer<typeof jobResultSchema>
+
+/** Page 1 drives the card header and the tray a file is filed under. */
+export const primaryPage = (result: JobResult): PageResult => result.pages[0]
 
 /** Grammar for Ollama's structured output. */
 export const verdictJsonSchema = z.toJSONSchema(verdictSchema, {
   io: "output",
 }) as Record<string, unknown>
 
-/** Ink load thresholds used by both the gauge and the risk reconciliation. */
+/** Ink load thresholds used by both the gauge and the risk band. */
 export const INK_HIGH_PCT = 22
 export const INK_MEDIUM_PCT = 10
 

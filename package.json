@@ -12,7 +12,10 @@
     "fixtures": "node scripts/generate-fixtures.ts",
     "format": "oxfmt . \"!components/ui\" \"!app/globals.css\"",
     "format:check": "oxfmt --check . \"!components/ui\" \"!app/globals.css\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:model": "vitest run --include tests/model.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -48,6 +51,7 @@
     "oxfmt": "^0.71.0",
     "oxlint": "^1.86.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }

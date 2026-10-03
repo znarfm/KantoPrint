@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 
 import { Ollama } from "ollama"
 
+import { isTextLike } from "./flags"
 import { verdictJsonSchema, verdictSchema, type Verdict } from "./prepress"
 
 export const OLLAMA_HOST = process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434"
@@ -33,7 +34,24 @@ function physicalCores(): number {
 
 const THREADS = Number(process.env.KANTOPRINT_THREADS ?? physicalCores())
 
-export const client = new Ollama({ host: OLLAMA_HOST })
+/**
+ * A wedged daemon must not hang a request: without this the queue stalls with
+ * no error and no way back. The pipeline is serial, so one stuck call blocks
+ * every job behind it.
+ */
+const VISION_TIMEOUT_MS = Number(
+  process.env.KANTOPRINT_VISION_TIMEOUT ?? 90_000
+)
+
+const timedFetch: typeof fetch = (input, init) => {
+  const timeout = AbortSignal.timeout(VISION_TIMEOUT_MS)
+  const signal = init?.signal
+    ? AbortSignal.any([init.signal, timeout])
+    : timeout
+  return fetch(input, { ...init, signal })
+}
+
+export const client = new Ollama({ host: OLLAMA_HOST, fetch: timedFetch })
 
 export type Health = {
   reachable: boolean
@@ -67,31 +85,33 @@ export async function checkHealth(): Promise<Health> {
 }
 
 const SYSTEM = `You are a prepress triage assistant for desktop inkjet and vinyl cutting.
-You get a raster of page 1 plus measured pixel statistics, and return one JSON verdict.
+You get a raster of one page plus measured pixel statistics, and return one JSON verdict.
 
 Measured (trust these over your own read of the image):
 mean ink load {{inkLoad}}% | solid dark area {{darkArea}}% | worst 64px tile {{peakTile}}%
 edge band {{edgeInk}}% | source transparency {{transparent}}
 Ink profile: {{profile}}
 
-Choose:
-- documentType: what the job is. "unknown" if the raster is unreadable.
+Return only these three fields:
+- documentType: what the job is. If the type is too small to read in the raster, take the
+  job from the ink profile above rather than answering "unknown". Reserve "unknown" for a
+  raster you cannot place at all.
 - recommendedMedia: stock follows job type first, ink load second.
   text document or form -> 70-80 GSM Bond, or Plain Recycled 100 GSM for sparse text.
   invitation -> 220+ GSM Matte Cardstock. photo -> 240 GSM Matte or Glossy Photo.
   die-cut sticker -> Glossy Vinyl Sticker Sheet, always.
-  ink above 40% -> 300 GSM Photo Board.
+  ink 20-40% -> 220+ GSM Matte Cardstock. ink above 40% -> 300 GSM Photo Board.
+  Never answer a heavy-ink page with bond or recycled paper.
   Never put a form on card stock, and never put a sticker on paper.
-- inkRiskLevel: high at or above 22% mean ink load or a saturated tile, medium from 10%.
-- hasBleedMargins: true only when ink or a cut line reaches the trim edge.
-- needsRotation: true when landscape and the machine feeds portrait, or artwork is sideways.
-- operatorNotes: one imperative sentence under 20 words. Name the action, not the problem.`
+- hasBleedMargins: true only when ink or a cut line reaches the trim edge.`
 
 /** Facts handed to the model: the same numbers the gauge shows, so the model and
  *  the operator read the same page. */
 export type PromptFacts = {
   thumbnail: Buffer
   kind: string
+  /** 1-based page being judged. */
+  pageIndex: number
   pageCount: number
   sizeLabel: string
   orientation: string
@@ -120,7 +140,7 @@ export function inkProfile(p: {
     return "heavy full-coverage colour ink, expect an invitation or photo"
   if (p.inkLoadPct >= 25)
     return "heavy full-coverage ink, expect a photo or solid panel"
-  if (p.inkLoadPct < 4 && p.darkAreaPct < 6)
+  if (isTextLike(p))
     return mono
       ? "sparse monochrome text, expect a document or form"
       : "sparse text and rules, expect a document"
@@ -128,7 +148,7 @@ export function inkProfile(p: {
 }
 
 function userPrompt(f: Omit<PromptFacts, "thumbnail">): string {
-  return `Page 1 of ${f.pageCount}, ${f.kind}, ${f.sizeLabel}, ${f.orientation} orientation. Set up stock and handling flags.`
+  return `Page ${f.pageIndex} of ${f.pageCount}, ${f.kind}, ${f.sizeLabel}, ${f.orientation} orientation. Set up stock and handling flags.`
 }
 
 /** One model call. The grammar is the Zod contract, so prose is impossible. */
