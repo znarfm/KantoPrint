@@ -1,19 +1,12 @@
-import { Button } from "@/components/ui/button"
+import { TriageConsole } from "@/components/triage-console"
+import { checkHealth } from "@/lib/judge"
 
-export default function Page() {
-  return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
-    </div>
-  )
+/** Ollama is probed per request: a baked-in build-time answer is worthless. */
+export const dynamic = "force-dynamic"
+
+export default async function Page() {
+  // Probed here so the status badge is right on first paint. The client keeps
+  // it fresh with a subscription rather than a fetch-on-mount effect.
+  const health = await checkHealth()
+  return <TriageConsole initialHealth={health} />
 }
